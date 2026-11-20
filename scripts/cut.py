@@ -20,10 +20,11 @@ def ts(t):
 
 
 import re as _re
-_SLURS = _re.compile(r"\b(nigg\w*|n[i1]gg?a\w*|f[a@]gg?\w*|retard\w*|tranny\w*|chink\w*|spic\w*|kike\w*)\b", _re.I)
+# Explicit endings instead of \w*, so "spicy", "retardant", "niggle", "Dickens" are left alone.
+_SLURS = _re.compile(r"\b(nigg(?!l)\w*|n[i1]gg?a\w*|f[a@]gg?(?:[o0]ts?|s)?|retard(?:s|ed)?|trann(?:y|ies)|chinks?|spics?|kikes?)\b", _re.I)
 
 
-_SWEARS = _re.compile(r"\b(fuck\w*|motherfuck\w*|shit\w*|bitch\w*|cunt\w*|dick\w*|pussy\w*|asshole\w*|bastard\w*|whore\w*|slut\w*)\b", _re.I)
+_SWEARS = _re.compile(r"\b(fuck\w*|motherfuck\w*|shit\w*|bitch\w*|cunt\w*|dick(?:s|head|heads|y)?|pussy|pussies|asshole\w*|bastard\w*|whore\w*|slut\w*)\b", _re.I)
 
 
 def _mask(m):
@@ -102,7 +103,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     if title:  # reaction title: (style, text, y, seconds)
         st, text, ty, secs = title
         end = (e0 - s0) if secs <= 0 else secs
-        lines = wrap(esc(text), 26 if st == 'box' else 24)
+        lines = wrap(esc(clean(text, profanity)), 26 if st == 'box' else 24)
         body = '\\N'.join(lines)
         if st == 'box':
             ev.append(f"Dialogue: 2,{ts(0)},{ts(end)},TitleBox,,0,0,0,,{{\\pos({W // 2},{ty})}}{body}")
@@ -110,7 +111,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             ev.append(f"Dialogue: 2,{ts(0)},{ts(end)},TitleOut,,0,0,0,,{{\\pos({W // 2},{ty})\\an8}}{body}")
         hook = ''
     if hook:
-        ev.append(f"Dialogue: 1,{ts(0)},{ts(hook_end)},Hook,,0,0,0,,{{\\fad(0,180)\\fscx92\\fscy92\\t(0,120,\\fscx100\\fscy100)}}{esc(hook)}")
+        ev.append(f"Dialogue: 1,{ts(0)},{ts(hook_end)},Hook,,0,0,0,,{{\\fad(0,180)\\fscx92\\fscy92\\t(0,120,\\fscx100\\fscy100)}}{esc(clean(hook, profanity))}")
     return hdr + "\n".join(ev) + "\n"
 
 
@@ -121,6 +122,13 @@ GAME_H = H - TOP  # 1190
 
 def even(n):
     return int(n) // 2 * 2
+
+
+def filter_path(p):
+    """Path as an unquoted ffmpeg filter option: escaped for the option parser (\\ ' :), then for the
+    filtergraph parser (\\ ' [ ] , ;). Single quotes can't hold a ' at all, so a name like O'Brien broke the old form."""
+    s = _re.sub(r"([\\':])", r"\\\1", str(p).replace("\\", "/"))
+    return _re.sub(r"([\\'\[\],;])", r"\\\1", s)
 
 
 def video_filter(layout, cam, ass, band=None, cam_side='right', src=None, game_x=None, face_expr=None):
@@ -149,10 +157,10 @@ def video_filter(layout, cam, ass, band=None, cam_side='right', src=None, game_x
             v = v[:-3] + f"[v0];[v0]drawbox=x=0:y={y0}:w=iw:h={bh}:color=white@1:t=fill{en}[v]"
     else:
         x, y, w, h = map(float, cam.split(":"))
-        v = (f"[0:v]split[a][b];[a]crop=iw*{w}:ih*{h}:iw*{x}:ih*{y},scale={W}:{int(H * 0.38)}:force_original_aspect_ratio=increase,"
-             f"crop={W}:{int(H * 0.38)}[cam];[b]scale=-2:{H - int(H * 0.38)},crop={W}:{H - int(H * 0.38)}[game];[cam][game]vstack[v]")
-    sub = str(ass).replace("\\", "/").replace(":", "\\:")
-    return v + f";[v]fps=30,subtitles='{sub}'[vo]"
+        ch = even(H * 0.38)  # both panel heights must be even, or yuv420p rounds each down and the clip ends up 1918 px tall
+        v = (f"[0:v]split[a][b];[a]crop=iw*{w}:ih*{h}:iw*{x}:ih*{y},scale={W}:{ch}:force_original_aspect_ratio=increase,"
+             f"crop={W}:{ch}[cam];[b]scale=-2:{H - ch},crop={W}:{H - ch}[game];[cam][game]vstack[v]")
+    return v + f";[v]fps=30,subtitles={filter_path(ass)}[vo]"
 
 
 def game_offset(video, s0, e0, src, cam_box):
