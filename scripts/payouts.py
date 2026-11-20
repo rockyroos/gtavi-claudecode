@@ -8,6 +8,7 @@ import argparse, csv, sys
 from collections import defaultdict
 from datetime import date
 from pathlib import Path
+import common  # noqa: F401  (switches stdout to UTF-8)
 
 FIELDS = ["date", "campaign", "platform", "post_url", "views", "rate_per_1k", "est_payout", "status"]
 

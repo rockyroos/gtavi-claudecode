@@ -2,6 +2,10 @@
 import hashlib, json, os, re, shutil, subprocess, sys
 from pathlib import Path
 
+for _s in (sys.stdout, sys.stderr):  # Windows consoles default to cp1252/cp437 and crash on emoji in video titles
+    if hasattr(_s, "reconfigure"):
+        _s.reconfigure(encoding="utf-8", errors="replace")
+
 ROOT = Path(os.environ.get("CLIP_DESK_HOME", Path.cwd()))
 JOBS = ROOT / "jobs"
 

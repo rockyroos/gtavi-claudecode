@@ -5,6 +5,7 @@ python questions.py --subs GTA6,GTA,GrandTheftAutoV --days 3 [--comments comment
 import argparse, difflib, json, re, sys, time, urllib.error, urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
+import common  # noqa: F401  (switches stdout to UTF-8; Reddit text has emoji)
 
 UA = "gta6-clip-desk/1.0 (questions-to-posts; read-only public JSON; contact via github Bodila51/gtavi-claudecode)"
 STARTERS = ("how", "where", "what", "can", "is", "does", "why", "when")
