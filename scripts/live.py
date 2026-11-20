@@ -189,13 +189,15 @@ def cut(rec, wall, before, after, lag, out):
     if not comp:
         return None, False
     f, st, en, mt, _ = comp[-1]
-    center = en - (mt - wall) + lag  # stream position of the event: reception time of last full segment anchors the clock
+    # en - (mt - wall) is where the recorder was at chat time; viewers saw that part later and reacted later, so the event is `lag` earlier
+    center = en - (mt - wall) - lag
     t0, t1 = max(0.0, center - before), center + after
     pick = [s for s in segs if s[2] > t0 and s[1] < t1]
     if not pick:
         return center, False
     lst = out.with_suffix(".txt")
-    lst.write_text("".join(f"file '{s[0].resolve().as_posix()}'\n" for s in pick), encoding="utf-8")
+    q = lambda p: p.resolve().as_posix().replace("'", "'\\''")  # concat syntax: close the quote, escaped ', reopen
+    lst.write_text("".join(f"file '{q(s[0])}'\n" for s in pick), encoding="utf-8")
     r = run([tool("ffmpeg"), "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(lst),
              "-ss", f"{max(0.0, t0 - pick[0][1]):.2f}", "-t", f"{t1 - t0:.2f}", "-c", "copy",
              "-avoid_negative_ts", "make_zero", "-movflags", "+faststart", str(out)], check=False, capture=True)
@@ -210,7 +212,7 @@ def main():
     ap.add_argument("--window", type=int, default=10); ap.add_argument("--baseline", type=int, default=300)
     ap.add_argument("--ratio", type=float, default=3); ap.add_argument("--min-msgs", type=int, default=8)
     ap.add_argument("--cooldown", type=float, default=45)
-    ap.add_argument("--lag", type=float, default=8, help="seconds to shift the clip later: stream delay + chat reaction time")
+    ap.add_argument("--lag", type=float, default=8, help="seconds to shift the clip EARLIER: how far viewers' video lags the recorder + chat reaction time")
     a = ap.parse_args()
 
     d = job_dir(a.url)
@@ -274,7 +276,7 @@ def main():
                     n += 1; spikes += 1; last_spike = t
                     words = tail.top_words(e - a.window + 1, e)
                     print(f"SPIKE #{n}: {raw} msgs/{a.window}s vs baseline {bw * a.window:.1f} weighted", flush=True)
-                    pending.append((n, float(e), raw, words, t + a.after + max(a.lag, 0)))
+                    pending.append((n, float(e), raw, words, t + a.after + max(-a.lag, 0)))  # a negative lag moves the window later, so wait for that footage
             for p in [p for p in pending if p[4] <= t]:
                 pending.remove(p); finish_one(p[:4])
     except KeyboardInterrupt:
@@ -290,7 +292,7 @@ def main():
             except subprocess.TimeoutExpired: chat.kill()
         for p in pending:
             finish_one(p[:4], final=True)
-        save_json(ld / "live.json", {"url": a.url, "spikes": spikes, "minutes": a.minutes})
+        save_json(ld / "live.json", {"url": a.url, "spikes": spikes, "minutes": a.minutes, "lag": a.lag, "before": a.before})
     print(f"done: {spikes} spike(s). See {spikes_md}")
 
 

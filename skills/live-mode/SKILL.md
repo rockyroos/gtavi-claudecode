@@ -22,4 +22,6 @@ While it runs:
 2. For each keeper, run `hook-writer` then `clip-cutter` (or use the auto-cut if the script produced one), then `rule-check`.
 3. Send the human one message with the best 1 to 3 clips (caption, credit, file path). They say "yes" and post. Speed matters, so keep it to one message.
 
+If the trigger moment is not near the 15 s mark in the clips, tune the timing: ask the human when the moment happens in 3 or more clips, then run `python "${CLAUDE_PLUGIN_ROOT}/scripts/calibrate_lag.py" --job jobs/<id> --event <secs> <secs> <secs>` and use its suggested `--lag` next time.
+
 When done: list what was recorded, what was clipped, and log the posts via `learning-loop`. Ask the streamer for permission when they are reachable.
